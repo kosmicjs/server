@@ -8,6 +8,8 @@ const xoConfig: XoConfigItem[] = [
     rules: {
       'capitalized-comments': 'off',
       '@typescript-eslint/naming-convention': 'off',
+      '@typescript-eslint/unified-signatures': 'off',
+      '@typescript-eslint/consistent-type-definitions': 'off',
     },
   },
   {
