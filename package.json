@@ -1,14 +1,25 @@
 {
-  "name": "spence-s-starter-template",
+  "name": "@kosmic/server",
   "version": "0.0.0",
-  "description": "An opinionated typescript + ESM starter template for new projects.",
-  "homepage": "https://github.com/spence-s/spence-s-starter-template",
+  "description": "A production-ready Koa server with TypeScript, file-system-based routing, and modern Node.js features.",
+  "keywords": [
+    "koa",
+    "server",
+    "typescript",
+    "esm",
+    "routing",
+    "middleware",
+    "file-system-routing",
+    "pino",
+    "helmet"
+  ],
+  "homepage": "https://github.com/kosmic/server",
   "bugs": {
-    "url": "https://github.com/spence-s/spence-s-starter-template/issues"
+    "url": "https://github.com/kosmic/server/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/spence-s/spence-s-starter-template.git"
+    "url": "git+https://github.com/kosmic/server.git"
   },
   "license": "MIT",
   "author": {
@@ -27,6 +38,9 @@
   },
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "rimraf dist && tsc -p tsconfig.build.json",
     "check": "tsc -p tsconfig.json",
@@ -88,7 +102,7 @@
   "engines": {
     "node": ">=22"
   },
-  "files: ": [
-    "dist"
-  ]
+  "publishConfig": {
+    "access": "public"
+  }
 }

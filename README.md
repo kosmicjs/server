@@ -1,144 +1,215 @@
-# spence-s-starter-template
+# @kosmic/server
 
-[![Node.js CI](https://github.com/spence-s/spence-s-starter-template/actions/workflows/node.js.yml/badge.svg?branch=main&event=push)](https://github.com/spence-s/spence-s-starter-template/actions/workflows/node.js.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
-[![npm version](https://img.shields.io/npm/v/spence-s-starter-template.svg)](https://www.npmjs.com/package/spence-s-starter-template)
-[![npm downloads](https://img.shields.io/npm/dm/spence-s-starter-template.svg)](https://www.npmjs.com/package/spence-s-starter-template)
+[![npm version](https://img.shields.io/npm/v/@kosmic/server.svg)](https://www.npmjs.com/package/@kosmic/server)
+[![npm downloads](https://img.shields.io/npm/dm/@kosmic/server.svg)](https://www.npmjs.com/package/@kosmic/server)
 
-A bleeding edge, prod ready starter template for creating and publishing [Node.js](https://nodejs.org) libraries to [npm](https://www.npmjs.com/).
+A production-ready [Koa](https://koajs.com/) server with TypeScript, file-system-based routing, and modern Node.js features.
 
-Features Include:
+## Features
 
-- MIT License
-- Configured for [pure ESM only](https://gist.github.com/sindresorhus/a39789f98801d908bbc7ff3ecc99d99c) output
-- Easy out-of-the box development with [watch](https://nodejs.org/api/cli.html#--watch) and [native type stripping](https://nodejs.org/docs/latest/api/typescript.html#modules-typescript)
-- [Editorconfig](https://editorconfig.org/) for collaboration
-- Testing with [node's native test runner](https://nodejs.org/api/test.html) - pre-setup for typescript ESM and TypeScript
-- CI runs on Node.js 20, 22, and 24 for pushes and pull requests to main in [github actions](https://github.com/features/actions)
-- Linting with [xo](https://github.com/xojs/xo) (space configuration)
-- Formatting with [prettier](https://prettier.io/) and [xo](https://github.com/xojs/xo)
-- Markdown linting and formatting with [prettier](https://prettier.io/)
-- Package.json linting and formatting with [prettier-plugin-package-json](https://www.npmjs.com/package/prettier-plugin-packagejson)
-- Sane package.json scripts
-- [Husky](https://typicode.github.io/husky/) for git hooks management
-- [lint-staged](https://github.com/okonet/lint-staged) for pre-commit linting
-- [Commitlint](https://commitlint.js.org/) with conventional commits
-- [np](https://github.com/sindresorhus/np) for publishing to npm
+- **File-System-Based Router**: Automatic route discovery based on file structure
+- **TypeScript Native**: Built with TypeScript and native Node.js type stripping
+- **Pure ESM**: Modern ES modules only
+- **Production-Ready Middleware**: Includes Helmet, Pino logging, response time tracking, and more
+- **Type-Safe**: Full TypeScript support with strict mode enabled
+- **Modern Node.js**: Leverages Node.js >=22 features including native test runner and watch mode
+- **Developer Experience**: Hot reload in development with native watch mode
+- **Comprehensive Testing**: Built-in test utilities and Node.js native test runner
+- **Code Quality**: Pre-configured with xo linting, prettier formatting, and git hooks
 
 ## Prerequisites
 
 - [Node.js](https://nodejs.org) version 22 or higher
-- npm (comes with Node.js)
 
-## Getting Started
+## Installation
 
-### Installation
+```bash
+npm install @kosmic/server
+```
 
-This is a github template and is best used by using the github UI to start a new project.
+## Quick Start
 
-Once you've cloned the template for a new repository, the first thing you want to do is to make sure all the deps are up to date!
+```typescript
+import { createServer } from "@kosmic/server";
 
-1. Run `npm install` to get the immediately needed deps
-2. run `npm run update` to have npm-check-updates run an interactive program to update all the other deps.
-3. run `npm run test` to ensure updates haven't broken anything themselves (this typically shouldn't happen).
+const app = createServer({
+  routesDir: "./routes",
+  logger: true,
+});
 
-### Customizing for Your Project
+app.listen(3000, () => {
+  console.log("Server running on http://localhost:3000");
+});
+```
 
-After cloning this template, you'll want to customize it for your specific project. Here's a checklist:
+## File-System-Based Routing
 
-- [ ] Update `name` in package.json to your project name
-- [ ] Update `description` in package.json
-- [ ] Update `author` information in package.json (name, email, url)
-- [ ] Update `repository.url` in package.json with your repository URL
-- [ ] Update `homepage` and `bugs.url` in package.json
-- [ ] Update the author name in LICENSE file
-- [ ] Update this README.md with your project's information
-- [ ] Replace the hello world code in `src/index.ts` with your actual code
-- [ ] Update the tests in `test/index.test.ts` for your code
+Routes are automatically discovered based on your file structure. Create files in your `routes` directory:
 
-### Run the hello world
+```
+routes/
+  index.ts          # GET /
+  users/
+    index.ts        # GET /users
+    [id].ts         # GET /users/:id
+  posts/
+    [postId].ts     # GET /posts/:postId
+```
 
-This starter-template is already set up to run typescript code out of the box node native type stripping and node native watch mode.
+### Route Handler Example
 
-`npm run dev`
+```typescript
+// routes/users/[id].ts
+import type { Context } from "koa";
 
-### Building the project
+export async function get(ctx: Context) {
+  const { id } = ctx.params;
+  ctx.body = { user: id };
+}
 
-`npm run build` will build the project to the `dist` directory (which is already gitignored).
+export async function put(ctx: Context) {
+  const { id } = ctx.params;
+  ctx.body = { updated: id };
+}
 
-### Developing
-
-`npm run dev` will build the project with `tsc --watch` execute the script with the new nodejs `watch` flag.
-
-### Testing
-
-`npm run test` run the tests once with node native type stripping.
-`npm run test:coverage` run the tests once with native type stripping node experimental test coverage flags.
-`npm run test:watch` run the tests in native watch mode with native type stripping.
-
-### Updating dependencies
-
-`npm run update` will use `ncu -i` to update all dependencies to their latest versions, interactively
-
-### Releasing
-
-To encourage best practices for publishing an open source package on npm, [np is installed by default](https://github.com/sindresorhus/np).
-
-`npm run release`
-
-## Scripts
-
-```json
-{
-  "scripts": {
-    "build": "rimraf dist && tsc -p tsconfig.build.json",
-    "check": "tsc -p tsconfig.json",
-    "dev": "node --watch src/index.ts",
-    "lint": "npm run check && xo",
-    "prepare": "husky",
-    "release": "np",
-    "start": "node dist/src/index.js",
-    "test": "npm run lint && node --test",
-    "test:coverage": "node --test --experimental-test-coverage",
-    "test:watch": "node --test --watch",
-    "update": "ncu -i"
-  }
+export async function del(ctx: Context) {
+  const { id } = ctx.params;
+  ctx.status = 204;
 }
 ```
 
-`build`: Builds the project into a dist directory for releasing to npm as `js` files complete with type defintions and source maps.
-`check`: Check the types without building the project.
-`dev`: Run the program in watch mode.
-`lint`: Run the linter (xo) and type checker. Note: The `test` script runs tests only; run `lint` separately if needed.
-`prepare`: Run the husky prepare script so husky is installed with deps.
-`release`: Use `np` to release the package to npm.
-`start`: Run the build js files from the `build` script.
-`test`: Run tests with node native test runner.
-`test:coverage`: Run tests with node native test coverage.
-`test:watch`: Run tests in watch mode.
-`update`: Update deps interactively to their latest versions.
+### Route-Specific Middleware
+
+```typescript
+// routes/admin/index.ts
+import type { Middleware } from "koa";
+
+// Middleware runs before route handlers
+export const use: Middleware = async (ctx, next) => {
+  // Auth check
+  if (!ctx.state.isAdmin) {
+    ctx.status = 403;
+    return;
+  }
+  await next();
+};
+
+export async function get(ctx) {
+  ctx.body = { admin: true };
+}
+```
+
+## Development
+
+### Building
+
+```bash
+npm run build          # Clean build to dist/ directory
+npm run check          # Type-check without building
+npm run dev            # Run in watch mode with native type stripping
+npm start              # Run built JS from dist/
+```
+
+### Testing
+
+```bash
+npm test               # Run linter and tests
+node --test            # Run tests only
+node --test --watch    # Watch mode
+npm run test:coverage  # With coverage report
+```
+
+### Linting
+
+```bash
+npm run lint           # Run xo linter and type checker
+xo --fix              # Auto-fix linting issues
+```
+
+## Middleware
+
+The server comes pre-configured with production-ready middleware:
+
+- **Helmet**: Security headers
+- **Pino Logger**: Fast JSON logging with request context
+- **Response Time**: Tracks response time in headers
+- **Body Parser**: Parses JSON and form data
+- **Conditional GET**: ETag support for caching
+- **Error Handler**: Centralized error handling
+
+### Custom Context
+
+The Koa context is extended with useful properties:
+
+```typescript
+import type { Context } from "koa";
+
+export async function get(ctx: Context) {
+  ctx.id; // Request ID (string | number)
+  ctx.log; // Pino logger instance scoped to this request
+
+  ctx.log.info("Processing request");
+  ctx.body = { success: true };
+}
+```
+
+## Configuration
+
+### TypeScript
+
+The project uses strict TypeScript with additional safety:
+
+- `strict: true`
+- `noUncheckedIndexedAccess: true`
+- `exactOptionalPropertyTypes: true`
+- `verbatimModuleSyntax: true`
+- `erasableSyntaxOnly: true` - Only erasable syntax (no enums, namespaces, parameter properties)
+
+### Code Style
+
+- **2 spaces** for indentation
+- **ESM only** - No CommonJS support
+- **`.ts` extensions** required for local imports
+- **`node:` protocol** for built-in imports
+- **Type imports** use `import type` syntax
+
+## API Reference
+
+For detailed API documentation and advanced usage, see the [API docs](./docs/api.md).
 
 ## Contributing
 
-This project uses [Commitlint](https://commitlint.js.org/) with conventional commits. When making commits, please follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+This project uses [Conventional Commits](https://www.conventionalcommits.org/). When making commits, please follow the format:
+
+```
+type(scope): description
+```
+
+Types: `feat`, `fix`, `docs`, `chore`, `test`, `refactor`, `style`, `perf`
 
 Examples:
 
-- `feat: add new feature`
-- `fix: resolve bug in function`
-- `docs: update README`
-- `chore: update dependencies`
+- `feat: add user authentication middleware`
+- `fix: resolve race condition in router`
+- `docs: update API documentation`
 
-Pre-commit hooks will automatically lint your staged files using [Husky](https://typicode.github.io/husky/) and [lint-staged](https://github.com/okonet/lint-staged).
+Pre-commit hooks automatically lint and format staged files.
 
-## TypeScript
+## TypeScript Support
 
-The tsconfig included in this template is set up for Node.JS native type stripping and includes the `erasableSyntaxOnly` option, so not all TypeScript features are supported.This decision was made to encourage adoption of cutting edge Node.JS features which improve DX. We continue to maintain a build and release option for packaging only `JavaScript` files, as node native type stripping will not strip imports from `node_modules` folders.
+The project is configured for Node.js native type stripping using the `erasableSyntaxOnly` option, which means not all TypeScript features are supported. This design choice enables better DX with native Node.js features while maintaining production builds as pure JavaScript.
 
-Learn More:
+**Unsupported TypeScript features:**
 
-- [TypeScript Modules](https://nodejs.org/api/typescript.html)
+- Enums
+- Namespaces
+- Parameter properties
+
+**Learn more:**
+
+- [TypeScript Modules in Node.js](https://nodejs.org/api/typescript.html)
 - [Erasable Syntax Only Reference](https://www.typescriptlang.org/tsconfig/#erasableSyntaxOnly)
 
 ## License
