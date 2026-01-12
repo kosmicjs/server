@@ -36,6 +36,13 @@ const xoConfig: XoConfigItem[] = [
       ],
     },
   },
+  {
+    files: ['test/fixtures/routes/**/*.ts'],
+    rules: {
+      // Allow camelCase in dynamic route parameter filenames like [userId].ts
+      'unicorn/filename-case': 'off',
+    },
+  },
 ];
 
 export default xoConfig;
