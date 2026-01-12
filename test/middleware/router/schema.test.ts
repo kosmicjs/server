@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-empty-function */
 import {test, describe} from 'node:test';
 import assert from 'node:assert';
 import type {Middleware} from 'koa';
@@ -27,11 +26,15 @@ void describe('Router Schema Validation', () => {
     void test('should return true for functions', () => {
       assert.strictEqual(isMiddleware(mockMiddleware), true);
       assert.strictEqual(
-        isMiddleware(() => {}),
+        isMiddleware(() => {
+          // Mock function
+        }),
         true,
       );
       assert.strictEqual(
-        isMiddleware(async () => {}),
+        isMiddleware(async () => {
+          // Mock async function
+        }),
         true,
       );
     });

@@ -1,10 +1,10 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument */
 import {test, describe} from 'node:test';
 import assert from 'node:assert';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import Koa from 'koa';
 import createFsRouter from '../../../src/middleware/router/index.ts';
+import type {RouteDefinition} from '../../../src/middleware/router/types.ts';
 import {
   createTestContext,
   createSpyNext,
@@ -14,6 +14,23 @@ import {createTestServer, request} from '../../utils/create-test-server.ts';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const fixturesDir = path.join(__dirname, '../../fixtures/routes');
+
+// Helper to create test context with specific path
+function createContextWithPath(method: string, urlPath: string) {
+  const ctx = createTestContext();
+  ctx.method = method;
+  ctx.url = urlPath;
+  ctx.path = urlPath;
+  ctx.request.method = method;
+  ctx.request.url = urlPath;
+  ctx.request.path = urlPath;
+  // Set originalUrl property - needed for routing
+  Object.defineProperty(ctx, 'originalUrl', {
+    value: urlPath,
+    writable: true,
+  });
+  return ctx;
+}
 
 void describe('File-System Router', () => {
   void describe('Unit Tests - createFsRouter', () => {
@@ -123,15 +140,21 @@ void describe('File-System Router', () => {
 
     void test('should emit router:loaded event with routes', async () => {
       const app = new Koa();
-      let eventData: any = null;
+      type RouterEventData = {
+        routes: Array<{method: string; path: string}>;
+      };
+      let receivedData: unknown = null;
 
-      app.on('router:loaded', (data) => {
-        eventData = data;
+      app.on('router:loaded', (data: unknown) => {
+        receivedData = data;
       });
 
       await createFsRouter(fixturesDir, app);
 
-      assert.ok(eventData, 'Should emit router:loaded event');
+      // Type guard and assertion
+      assert.ok(receivedData, 'Should emit router:loaded event');
+
+      const eventData = receivedData as RouterEventData;
       assert.ok(
         Array.isArray(eventData.routes),
         'Event should have routes array',
@@ -140,18 +163,17 @@ void describe('File-System Router', () => {
 
       // Check route format
       const firstRoute = eventData.routes[0];
+      if (!firstRoute) {
+        throw new Error('Route should exist');
+      }
+
       assert.ok(firstRoute.method, 'Route should have method');
       assert.ok(firstRoute.path, 'Route should have path');
     });
 
     void test('should match routes and extract params at runtime', async () => {
       const {middleware} = await createFsRouter(fixturesDir);
-      const ctx = createTestContext({
-        method: 'GET',
-        url: '/users/123',
-        path: '/users/123',
-        originalUrl: '/users/123',
-      } as any);
+      const ctx = createContextWithPath('GET', '/users/123');
       const next = createSpyNext();
 
       await middleware(ctx, next);
@@ -164,12 +186,7 @@ void describe('File-System Router', () => {
 
     void test('should call next when no route matches', async () => {
       const {middleware} = await createFsRouter(fixturesDir);
-      const ctx = createTestContext({
-        method: 'GET',
-        url: '/nonexistent',
-        path: '/nonexistent',
-        originalUrl: '/nonexistent',
-      } as any);
+      const ctx = createContextWithPath('GET', '/nonexistent');
       const next = createSpyNext();
 
       await middleware(ctx, next);
@@ -183,12 +200,7 @@ void describe('File-System Router', () => {
 
     void test('should call next when method does not match', async () => {
       const {middleware} = await createFsRouter(fixturesDir);
-      const ctx = createTestContext({
-        method: 'PATCH',
-        url: '/api/health',
-        path: '/api/health',
-        originalUrl: '/api/health',
-      } as any);
+      const ctx = createContextWithPath('PATCH', '/api/health');
       const next = createSpyNext();
 
       await middleware(ctx, next);
@@ -202,12 +214,14 @@ void describe('File-System Router', () => {
 
     void test('should handle query strings in URLs', async () => {
       const {middleware} = await createFsRouter(fixturesDir);
-      const ctx = createTestContext({
-        method: 'GET',
-        url: '/users/123?foo=bar',
-        path: '/users/123',
-        originalUrl: '/users/123?foo=bar',
-      } as any);
+      const ctx = createContextWithPath('GET', '/users/123');
+      // Override url to include query string, but path remains without it
+      ctx.url = '/users/123?foo=bar';
+      ctx.request.url = '/users/123?foo=bar';
+      Object.defineProperty(ctx, 'originalUrl', {
+        value: '/users/123?foo=bar',
+        writable: true,
+      });
       const next = createSpyNext();
 
       await middleware(ctx, next);
@@ -222,12 +236,7 @@ void describe('File-System Router', () => {
 
     void test('should handle nested dynamic parameters', async () => {
       const {middleware} = await createFsRouter(fixturesDir);
-      const ctx = createTestContext({
-        method: 'GET',
-        url: '/posts/456/comments/789',
-        path: '/posts/456/comments/789',
-        originalUrl: '/posts/456/comments/789',
-      } as any);
+      const ctx = createContextWithPath('GET', '/posts/456/comments/789');
       const next = createSpyNext();
 
       await middleware(ctx, next);
@@ -254,7 +263,7 @@ void describe('File-System Router', () => {
         const response = await request(`${server.baseUrl}/`);
 
         assert.strictEqual(response.status, 200);
-        const body = response.json();
+        const body = response.json() as {message: string};
         assert.strictEqual(body.message, 'Root route');
       } finally {
         await server.close();
@@ -272,7 +281,10 @@ void describe('File-System Router', () => {
         const response = await request(`${server.baseUrl}/users`);
 
         assert.strictEqual(response.status, 200);
-        const body = response.json();
+        const body = response.json() as {
+          users: string[];
+          authenticated: boolean;
+        };
         assert.deepStrictEqual(body.users, ['alice', 'bob']);
         assert.strictEqual(body.authenticated, true, 'Middleware should run');
       } finally {
@@ -293,7 +305,10 @@ void describe('File-System Router', () => {
         });
 
         assert.strictEqual(response.status, 201);
-        const body = response.json();
+        const body = response.json() as {
+          created: boolean;
+          authenticated: boolean;
+        };
         assert.strictEqual(body.created, true);
         assert.strictEqual(
           body.authenticated,
@@ -316,7 +331,11 @@ void describe('File-System Router', () => {
         const response = await request(`${server.baseUrl}/users/42`);
 
         assert.strictEqual(response.status, 200);
-        const body = response.json();
+        const body = response.json() as {
+          id: string;
+          name: string;
+          authenticated: boolean;
+        };
         assert.strictEqual(body.id, '42');
         assert.strictEqual(body.name, 'User 42');
         assert.strictEqual(
@@ -342,7 +361,11 @@ void describe('File-System Router', () => {
         );
 
         assert.strictEqual(response.status, 200);
-        const body = response.json();
+        const body = response.json() as {
+          postId: string;
+          commentId: string;
+          text: string;
+        };
         assert.strictEqual(body.postId, '123');
         assert.strictEqual(body.commentId, '456');
         assert.strictEqual(body.text, 'Comment 456 on post 123');
@@ -380,7 +403,10 @@ void describe('File-System Router', () => {
         // GET should have corsEnabled but not validated
         const getResponse = await request(`${server.baseUrl}/posts`);
         assert.strictEqual(getResponse.status, 200);
-        const getBody = getResponse.json();
+        const getBody = getResponse.json() as {
+          corsEnabled: boolean;
+          validated?: boolean;
+        };
         assert.strictEqual(getBody.corsEnabled, true);
         assert.strictEqual(getBody.validated, undefined);
 
@@ -389,7 +415,10 @@ void describe('File-System Router', () => {
           method: 'POST',
         });
         assert.strictEqual(postResponse.status, 201);
-        const postBody = postResponse.json();
+        const postBody = postResponse.json() as {
+          corsEnabled: boolean;
+          validated: boolean;
+        };
         assert.strictEqual(postBody.corsEnabled, true);
         assert.strictEqual(postBody.validated, true);
 
@@ -398,7 +427,10 @@ void describe('File-System Router', () => {
           method: 'PUT',
         });
         assert.strictEqual(putResponse.status, 200);
-        const putBody = putResponse.json();
+        const putBody = putResponse.json() as {
+          corsEnabled: boolean;
+          validated: boolean;
+        };
         assert.strictEqual(putBody.corsEnabled, true);
         assert.strictEqual(putBody.validated, true);
       } finally {
@@ -444,7 +476,7 @@ void describe('File-System Router', () => {
           method: 'PUT',
         });
         assert.strictEqual(putResponse.status, 200);
-        const putBody = putResponse.json();
+        const putBody = putResponse.json() as {updated: boolean};
         assert.strictEqual(putBody.updated, true);
       } finally {
         await server.close();

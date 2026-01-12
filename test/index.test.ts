@@ -1,10 +1,11 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {test, describe} from 'node:test';
 import assert from 'node:assert';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import fs from 'node:fs/promises';
 import passport from 'koa-passport';
+import type session from 'koa-session';
+import Koa from 'koa';
 import {app, createServer, getCtx} from '../src/index.ts';
 import {request} from './utils/create-test-server.ts';
 
@@ -12,6 +13,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const fixturesDir = path.join(__dirname, 'fixtures/routes');
 const temporaryPublicDir = path.join(__dirname, 'temp-public');
+
+// Type-safe session options
+// @ts-expect-error mocks
+const testSessionOptions: session.opts = {
+  key: 'test:sess',
+  maxAge: 86_400_000,
+};
 
 void describe('Main Server', () => {
   void describe('app export', () => {
@@ -21,11 +29,50 @@ void describe('Main Server', () => {
       assert.strictEqual(typeof app.listen, 'function');
     });
 
-    void test('should have asyncLocalStorage enabled', () => {
-      // The app is created with {asyncLocalStorage: true}
-      // We can verify by checking if the option was passed
-      // This is more of a smoke test since the constructor option isn't directly accessible
-      assert.ok(app);
+    void test('should have asyncLocalStorage enabled', async () => {
+      // Create a server with a test route that uses getCtx
+      await fs.mkdir(temporaryPublicDir, {recursive: true});
+
+      try {
+        const server = await createServer({
+          routesDirectory: fixturesDir,
+          sessionOptions: testSessionOptions,
+          passport,
+          publicDirectory: temporaryPublicDir,
+          serveOptions: {},
+        });
+
+        // Start server
+        await new Promise<void>((resolve) => {
+          server.listen(0, () => {
+            resolve();
+          });
+        });
+
+        const address = server.address();
+        if (!address || typeof address === 'string') {
+          throw new Error('Failed to get server address');
+        }
+
+        const baseUrl = `http://localhost:${address.port}`;
+
+        // Make a request - asyncLocalStorage should provide context
+        const response = await request(`${baseUrl}/`);
+        assert.strictEqual(response.status, 200);
+
+        // Clean up
+        await new Promise<void>((resolve, reject) => {
+          server.close((error) => {
+            if (error) {
+              reject(error);
+            } else {
+              resolve();
+            }
+          });
+        });
+      } finally {
+        await fs.rm(temporaryPublicDir, {recursive: true, force: true});
+      }
     });
   });
 
@@ -41,10 +88,58 @@ void describe('Main Server', () => {
       );
     });
 
-    void test('should return context when available', async () => {
-      // This would require setting up async local storage context
-      // For now, we test that it throws when no context exists
-      assert.throws(() => getCtx(), /No context found/);
+    void test('should return context when available during request', async () => {
+      await fs.mkdir(temporaryPublicDir, {recursive: true});
+
+      try {
+        const server = await createServer({
+          routesDirectory: fixturesDir,
+          sessionOptions: testSessionOptions,
+          passport,
+          publicDirectory: temporaryPublicDir,
+          serveOptions: {},
+        });
+
+        // Start server
+        await new Promise<void>((resolve) => {
+          server.listen(0, () => {
+            resolve();
+          });
+        });
+
+        const address = server.address();
+        if (!address || typeof address === 'string') {
+          throw new Error('Failed to get server address');
+        }
+
+        const baseUrl = `http://localhost:${address.port}`;
+
+        // Make request to route that uses getCtx
+        const response = await request(`${baseUrl}/test-ctx`);
+        assert.strictEqual(response.status, 200);
+
+        const body = response.json() as {
+          hasContext: boolean;
+          path: string;
+          method: string;
+        };
+        assert.strictEqual(body.hasContext, true);
+        assert.strictEqual(body.path, '/test-ctx');
+        assert.strictEqual(body.method, 'GET');
+
+        // Clean up
+        await new Promise<void>((resolve, reject) => {
+          server.close((error) => {
+            if (error) {
+              reject(error);
+            } else {
+              resolve();
+            }
+          });
+        });
+      } finally {
+        await fs.rm(temporaryPublicDir, {recursive: true, force: true});
+      }
     });
   });
 
@@ -56,10 +151,7 @@ void describe('Main Server', () => {
       try {
         const server = await createServer({
           routesDirectory: fixturesDir,
-          sessionOptions: {
-            key: 'test:sess',
-            maxAge: 86_400_000,
-          } as any,
+          sessionOptions: testSessionOptions,
           passport,
           publicDirectory: temporaryPublicDir,
           serveOptions: {},
@@ -80,10 +172,7 @@ void describe('Main Server', () => {
       try {
         const server = await createServer({
           routesDirectory: fixturesDir,
-          sessionOptions: {
-            key: 'test:sess',
-            maxAge: 86_400_000,
-          } as any,
+          sessionOptions: testSessionOptions,
           passport,
           publicDirectory: temporaryPublicDir,
           serveOptions: {},
@@ -104,8 +193,20 @@ void describe('Main Server', () => {
         const baseUrl = `http://localhost:${address.port}`;
 
         // Make request - should work despite no manifest
-        const response = await request(`${baseUrl}/api/health`);
+        const response = await request(`${baseUrl}/test-manifest`);
         assert.strictEqual(response.status, 200);
+
+        // Verify manifest is undefined
+        const body = response.json() as {
+          hasManifest: boolean;
+          manifest: unknown;
+        };
+        assert.strictEqual(
+          body.hasManifest,
+          false,
+          'Manifest should be undefined when file is missing',
+        );
+        assert.strictEqual(body.manifest, undefined);
 
         // Clean up
         await new Promise<void>((resolve, reject) => {
@@ -141,10 +242,7 @@ void describe('Main Server', () => {
       try {
         const server = await createServer({
           routesDirectory: fixturesDir,
-          sessionOptions: {
-            key: 'test:sess',
-            maxAge: 86_400_000,
-          } as any,
+          sessionOptions: testSessionOptions,
           passport,
           publicDirectory: temporaryPublicDir,
           serveOptions: {},
@@ -165,8 +263,21 @@ void describe('Main Server', () => {
         const baseUrl = `http://localhost:${address.port}`;
 
         // Make request - manifest should be loaded
-        const response = await request(`${baseUrl}/api/health`);
+        const response = await request(`${baseUrl}/test-manifest`);
         assert.strictEqual(response.status, 200);
+
+        // Verify manifest was loaded into context state
+        const body = response.json() as {
+          hasManifest: boolean;
+          manifest: Record<string, unknown>;
+        };
+        assert.strictEqual(
+          body.hasManifest,
+          true,
+          'Manifest should be loaded from file',
+        );
+        assert.ok(body.manifest);
+        assert.ok(body.manifest['main.ts']);
 
         // Clean up
         await new Promise<void>((resolve, reject) => {
@@ -186,10 +297,7 @@ void describe('Main Server', () => {
       try {
         const server = await createServer({
           routesDirectory: fixturesDir,
-          sessionOptions: {
-            key: 'test:sess',
-            maxAge: 86_400_000,
-          } as any,
+          sessionOptions: testSessionOptions,
           passport,
           publicDirectory: temporaryPublicDir,
           serveOptions: {},
@@ -241,10 +349,7 @@ void describe('Main Server', () => {
       try {
         const server = await createServer({
           routesDirectory: fixturesDir,
-          sessionOptions: {
-            key: 'test:sess',
-            maxAge: 86_400_000,
-          } as any,
+          sessionOptions: testSessionOptions,
           passport,
           publicDirectory: temporaryPublicDir,
           serveOptions: {},
@@ -287,10 +392,7 @@ void describe('Main Server', () => {
       try {
         const server = await createServer({
           routesDirectory: fixturesDir,
-          sessionOptions: {
-            key: 'test:sess',
-            maxAge: 86_400_000,
-          } as any,
+          sessionOptions: testSessionOptions,
           passport,
           publicDirectory: temporaryPublicDir,
           serveOptions: {},
@@ -310,10 +412,7 @@ void describe('Main Server', () => {
       try {
         const server = await createServer({
           routesDirectory: fixturesDir,
-          sessionOptions: {
-            key: 'test:sess',
-            maxAge: 86_400_000,
-          } as any,
+          sessionOptions: testSessionOptions,
           passport,
           publicDirectory: temporaryPublicDir,
           serveOptions: {},

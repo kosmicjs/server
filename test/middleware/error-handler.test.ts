@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/only-throw-error */
 import {test, describe} from 'node:test';
 import assert from 'node:assert';
 import {errorHandler} from '../../src/middleware/error-handler.ts';
@@ -20,7 +19,7 @@ void describe('errorHandler middleware', () => {
     assert.ok(ctx.response.status === 200 || ctx.status === 200);
   });
 
-  void test('should catch errors and set status to 500', async () => {
+  void test('should catch errors and set status to 500 by default', async () => {
     const middleware = errorHandler();
     const ctx = createTestContext();
     const error = new Error('Test error');
@@ -34,10 +33,10 @@ void describe('errorHandler middleware', () => {
     assert.strictEqual(ctx.body, error);
   });
 
-  void test('should handle errors with custom status codes', async () => {
+  void test('should respect custom status codes from error.status', async () => {
     const middleware = errorHandler();
     const ctx = createTestContext();
-    const error: any = new Error('Not found');
+    const error = new Error('Not found') as Error & {status: number};
     error.status = 404;
     const next = async () => {
       throw error;
@@ -45,29 +44,45 @@ void describe('errorHandler middleware', () => {
 
     await middleware(ctx, next);
 
-    // Error handler sets status to 500 regardless
-    assert.strictEqual(ctx.status, 500);
+    assert.strictEqual(ctx.status, 404);
     assert.strictEqual(ctx.body, error);
   });
 
-  void test('should handle non-Error throws', async () => {
+  void test('should respect custom status codes from error.statusCode', async () => {
     const middleware = errorHandler();
     const ctx = createTestContext();
-    const errorObject = {message: 'Custom error object'};
+    const error = new Error('Bad request') as Error & {statusCode: number};
+    error.statusCode = 400;
     const next = async () => {
+      throw error;
+    };
+
+    await middleware(ctx, next);
+
+    assert.strictEqual(ctx.status, 400);
+    assert.strictEqual(ctx.body, error);
+  });
+
+  void test('should handle non-Error objects with status', async () => {
+    const middleware = errorHandler();
+    const ctx = createTestContext();
+    const errorObject = {message: 'Custom error object', status: 403};
+    const next = async () => {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error
       throw errorObject;
     };
 
     await middleware(ctx, next);
 
-    assert.strictEqual(ctx.status, 500);
+    assert.strictEqual(ctx.status, 403);
     assert.strictEqual(ctx.body, errorObject);
   });
 
-  void test('should handle string errors', async () => {
+  void test('should handle string errors with default 500 status', async () => {
     const middleware = errorHandler();
     const ctx = createTestContext();
     const next = async () => {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error
       throw 'String error';
     };
 

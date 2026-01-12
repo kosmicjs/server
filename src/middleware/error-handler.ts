@@ -5,7 +5,15 @@ export function errorHandler(): Middleware {
     try {
       await next();
     } catch (error) {
-      ctx.status = 500;
+      // Respect custom status codes if provided
+      if (error && typeof error === 'object' && 'status' in error) {
+        ctx.status = (error as {status: number}).status;
+      } else if (error && typeof error === 'object' && 'statusCode' in error) {
+        ctx.status = (error as {statusCode: number}).statusCode;
+      } else {
+        ctx.status = 500;
+      }
+
       ctx.body = error;
     }
   }
